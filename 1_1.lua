@@ -1,9 +1,9 @@
 last = nil
 count = 0
-index = 0
+index = 1
 
 function _init ()
-  input = split(input, '\n')
+  input = split(test_input, '\n')
 end
 
 function _update60 ()
