@@ -40,5 +40,6 @@ end
 function _draw ()
 	cls()
 
-  Draw.metalic_text('- '..pos_x..', '..depth..' -', 2, 2, 'gold')
+  Draw.metalic_text('horz  '..pos_x, 2, 2)
+  Draw.metalic_text('depth '..depth, 2, 2 + 7)
 end

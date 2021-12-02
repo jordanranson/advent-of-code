@@ -14,3 +14,7 @@ function Math.s32_tostr (v)
   if v < 0 then return '-' .. Math.u32_tostr(-v) end
   return Math.u32_tostr(v)
 end
+
+function Math.tan (v)
+  return sin(v) / cos(v)
+end
