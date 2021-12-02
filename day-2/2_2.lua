@@ -43,5 +43,7 @@ end
 function _draw ()
 	cls()
 
-  Draw.metalic_text('- horz ('..pos_x..'), depth ('..Math.u32_tostr(depth)..') -', 2, 2, 'gold')
+  Draw.metalic_text('horz  '..pos_x, 2, 2)
+  Draw.metalic_text('depth '..Math.u32_tostr(depth), 2, 2 + 7)
+  Draw.metalic_text('aim   '..aim..' ('..(aim%360)..')', 2, 2 + 14)
 end

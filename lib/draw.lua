@@ -22,6 +22,8 @@ function Draw.clr_clip ()
 end
 
 function Draw.metalic_text (str, x, y, col, shadow)
+  col = col or 'gold'
+
   local palette = Draw.metalic_text_palettes[col]
 
   if shadow != nil then print(str, x + 2, y + 2, shadow) end
