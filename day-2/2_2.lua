@@ -1,6 +1,8 @@
 step = 1
 pos_x = 0
 depth = 0
+depth_i = 0
+aim = 0
 
 function _init ()
   input = split(input, '\n')
@@ -24,14 +26,15 @@ function _update60 ()
 
   if command == 'forward' then
     pos_x += amount
+    depth += (aim * amount) >> 16
   end
 
   if command == 'down' then
-    depth += amount
+    aim += amount
   end
 
   if command == 'up' then
-    depth -= amount
+    aim -= amount
   end
 
   step += 1
@@ -40,5 +43,5 @@ end
 function _draw ()
 	cls()
 
-  Draw.metalic_text('- '..pos_x..', '..depth..' -', 2, 2, 'gold')
+  Draw.metalic_text('- horz ('..pos_x..'), depth ('..Math.u32_tostr(depth)..') -', 2, 2, 'gold')
 end
