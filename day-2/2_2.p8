@@ -3,6 +3,7 @@ version 33
 __lua__
 #include ../lib/animate.lua
 #include ../lib/draw.lua
+#include ../lib/ease.lua
 #include ../lib/math.lua
 #include 2_1_input.lua
 #include 2_2.lua
