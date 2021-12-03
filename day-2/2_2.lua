@@ -30,6 +30,13 @@ col_track_0 = 3
 col_track_1 = 4
 col_track_2 = 5
 col_track_3 = 6
+col_gauge_0 = 7
+col_silver_0 = 8
+col_silver_1 = 9
+col_gold_0 = 10
+col_gold_1 = 11
+
+bubbles = {}
 
 function find_segment (z)
   return segments[(flr(z/segment_length) % #segments) + 1]
@@ -98,7 +105,6 @@ function add_segment (curve, y)
       screen = {}
     },
     curve = curve,
-    sprites = {},
     wiggle = rnd()
   })
 end
@@ -119,10 +125,6 @@ function add_road (enter, hold, leave, curve, y)
   end
 end
 
-function add_sprite (n, sprite, offset)
-  add(segments[n].sprites, { sprite = sprite, offset = offset })
-end
-
 function _init ()
   -- parse input
   input = split(input, '\n')
@@ -134,21 +136,9 @@ function _init ()
 
   input = input_pairs
 
-  -- alternative palette
-  -- pal(1, 140, 1)
-  pal(2, 129, 1)
-  pal(3, 5, 1)
-  pal(5, 143, 1)
-  pal(6, 15, 1)
-
   -- prepare road segments
   add_road(20, 50, 20, -2, -20)
   add_road(20, 50, 20, 2, 20)
-
-  -- for n = 250, 500, 5 do
-  --   add_sprite(n + flr(rnd(5) + 0.5), { x = 5, y = 5, w = 10, h = 10 }, -1 - rnd(2))
-  --   add_sprite(n + flr(rnd(5) + 0.5), { x = -5, y = 5, w = 10, h = 10 }, -1 - rnd(2))
-  -- end
 
   -- computed values
   track_length = #segments * segment_length
@@ -168,7 +158,15 @@ function increment (start, amount, max)
 end
 
 function _update60 ()
-  -- camera_z = increment(camera_z, sub_speed, track_length)
+  for i = 1, #bubbles do
+    if bubbles[i] then
+      bubbles[i].x -= bubbles[i].vx
+      bubbles[i].y -= bubbles[i].vy
+      if bubbles[i].x < -128 or bubbles[i].y < -128 then
+        del(bubbles, bubbles[i])
+      end
+    end
+  end
 
   local dx = sub_speed/sub_max_speed
 
@@ -211,18 +209,40 @@ function _update60 ()
   local speed = mid(0, soln_horz - soln_cur_horz, sub_max_speed)
   camera_z = increment(camera_z, speed, track_length)
 
+  if soln_step % 5 == 0 then
+    local colors = {8,9,12}
+    add(bubbles, {
+      x = rnd(128),
+      y = 96,
+      vx = 0.2 + rnd(4) - 2,
+      vy = 0.1 + rnd(2),
+      r = flr(rnd(4)),
+      col = colors[1 + flr(rnd(#colors))]
+    })
+  end
+
   soln_step += 1
 end
 
 function _draw ()
 	cls(col_bg)
 
-  -- fillp(0b0101101001011010)
-  fillp(0b0000111100001111)
-  rectfill(0, 0, 128, 128, 2)
+  pal(2, 129, 1)
+  pal(3, 5, 1)
+  pal(5, 143, 1)
+  pal(6, 15, 1)
+  pal(7, 128, 1)
+  pal(8, 6, 1)
+  pal(9, 7, 1)
+  pal(10, 9, 1)
+  pal(11, 10, 1)
 
-  fillp(0b0000000000000000)
-  circfill(64, 64, 52, 2)
+  rectfill(0, 0, 128, 128, col_ground)
+  for y = 0, 127 do
+    clip(0, y, 128, 1)
+    circfill(64 + sin((time() + y) * 0.51) * 7, 64 + sin((time() + y) * 0.25) * 20, 52, col_bg)
+  end
+  clip(0, 0, 128, 128)
 
   -- segments
   local base_segment = find_segment(camera_z)
@@ -328,35 +348,21 @@ function _draw ()
     end
   end
 
-  local sprite, sprite_scale, sprite_x, sprite_y, sprite_offset
-  for n = draw_dist-1, 0, -1 do
-    segment = segments[((base_segment.index + n) % #segments) + 1]
+  for i = 1, #bubbles do
+    local x = bubbles[i].x
+    local y = bubbles[i].y
 
-    for i = 1, #segment.sprites do
-      sprite = segment.sprites[i]
-      sprite_scale = segment.p1.screen.scale
-      sprite_x = segment.p1.screen.x + (sprite_scale * sprite.offset * segment_width * 64)
-      sprite_y = segment.p1.screen.y
-      sprite_offset = 0
-      if sprite.offset < 0 then sprite_offset = -1 end
-      -- Render.sprite(
-      --   64,
-      --   64,
-      --   1,
-      --   segment_width,
-      --   sprites,
-      --   sprite.sprite,
-      --   sprite_scale,
-      --   sprite_x,
-      --   sprite_y,
-      --   sprite_offset,
-      --   -1,
-      --   segment.clip
-      -- )
+    if x >= 0 and x <= 128 then
+      circ(x, y, bubbles[i].r, bubbles[i].col)
     end
   end
 
-  Draw.metalic_text('horz  '..soln_horz, 2, 2)
-  Draw.metalic_text('depth '..Math.u32_tostr(soln_depth), 2, 2 + 7)
-  Draw.metalic_text('aim   '..soln_aim..' ('..(soln_aim%360)..')', 2, 2 + 14)
+  local palette = {col_silver_1,col_silver_0,col_silver_1}
+  Draw.metalic_text('> horz  '..soln_horz, 2, 2, palette, 0)
+  Draw.metalic_text('> depth '..Math.u32_tostr(soln_depth), 2, 2 + 7, palette, 0)
+  Draw.metalic_text('> aim   '..soln_aim, 2, 2 + 14, palette, 0)
+end
+
+function sub_y ()
+  return sin(time() * 0.4) * 6 + 30
 end

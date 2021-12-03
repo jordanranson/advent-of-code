@@ -9,7 +9,7 @@ Draw = {
   }
 }
 
-function Draw.dither (should_dither) 
+function Draw.dither (should_dither)
   if should_dither then
     fillp(0b0101101001011010)
   else
@@ -23,8 +23,8 @@ end
 
 function Draw.metalic_text (str, x, y, col, shadow)
   col = col or 'gold'
-
-  local palette = Draw.metalic_text_palettes[col]
+  local palette = col
+  if type(col) == 'string' then palette = Draw.metalic_text_palettes[col] end
 
   if shadow != nil then print(str, x + 2, y + 2, shadow) end
   print(str, x, y, palette[2])
