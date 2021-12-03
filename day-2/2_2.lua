@@ -1,27 +1,35 @@
 soln_step = 1
 soln_horz = 0
+soln_cur_horz = 0
 soln_depth = 0
 soln_aim = 0
 
 segments = {}
-segment_width = 1500
+segment_width = 2000
 segment_length = 100
 rumble_length = 3
 track_length = nil
 
 fov = 100
-camera_height = 1000
+camera_height = 1500
 camera_depth = nil
 camera_z = 0
-draw_dist = 64
+draw_dist = 100
 fog_density = 5
 
 sub_x = 0
 sub_z = nil
-sub_speed = 50
+sub_speed = 60
 sub_max_speed = segment_length / (1/60)
 
 rad_constant = 0.01745329251994329576923690768489
+
+col_bg = 1
+col_ground = 2
+col_track_0 = 3
+col_track_1 = 4
+col_track_2 = 5
+col_track_3 = 6
 
 function find_segment (z)
   return segments[(flr(z/segment_length) % #segments) + 1]
@@ -69,41 +77,50 @@ function draw_segment (x1, y1, w1, x2, y2, w2, color)
   )
 end
 
-function add_segment (curve)
-  local n = #segments
+function last_y ()
+  if #segments == 0 then return 0 end
+  return segments[#segments].p2.world.y
+end
 
-  local colors = {15,13,6,13}
-  local color = colors[(flr(n/rumble_length) % 4) + 1]
+function add_segment (curve, y)
+  local n = #segments
 
   add(segments, {
     index = n,
     p1 = {
-      world = { z = n*segment_length },
+      world = { y = last_y(), z = n*segment_length },
       camera = {},
       screen = {}
     },
     p2 = {
-      world = { z = (n+1)*segment_length },
+      world = { y = y, z = (n+1)*segment_length },
       camera = {},
       screen = {}
     },
     curve = curve,
-    color = color
+    sprites = {},
+    wiggle = rnd()
   })
-
-  track_length = #segments * segment_length
 end
 
-function add_road (enter, hold, leave, curve)
+function add_road (enter, hold, leave, curve, y)
+  local start_y = last_y()
+  local end_y = start_y + (y*segment_length)
+  local total = enter + hold + leave
+
   for n = 0, enter do
-    add_segment(Ease.ease_in(0, curve, n/enter))
+    add_segment(Ease.ease_in(0, curve, n/enter), Ease.ease_in_out(start_y, end_y, n/total))
   end
   for n = 0, hold do
-    add_segment(curve)
+    add_segment(curve, Ease.ease_in_out(start_y, end_y, (enter+n)/total))
   end
   for n = 0, leave do
-    add_segment(Ease.ease_in_out(curve, 0, n/leave))
+    add_segment(Ease.ease_in_out(curve, 0, n/leave), Ease.ease_in_out(start_y, end_y, (enter+hold+n)/total))
   end
+end
+
+function add_sprite (n, sprite, offset)
+  add(segments[n].sprites, { sprite = sprite, offset = offset })
 end
 
 function _init ()
@@ -117,11 +134,24 @@ function _init ()
 
   input = input_pairs
 
+  -- alternative palette
+  -- pal(1, 140, 1)
+  pal(2, 129, 1)
+  pal(3, 5, 1)
+  pal(5, 143, 1)
+  pal(6, 15, 1)
+
   -- prepare road segments
-  add_road(20, 50, 20, -2)
-  add_road(20, 50, 20, 2)
+  add_road(20, 50, 20, -2, -20)
+  add_road(20, 50, 20, 2, 20)
+
+  -- for n = 250, 500, 5 do
+  --   add_sprite(n + flr(rnd(5) + 0.5), { x = 5, y = 5, w = 10, h = 10 }, -1 - rnd(2))
+  --   add_sprite(n + flr(rnd(5) + 0.5), { x = -5, y = 5, w = 10, h = 10 }, -1 - rnd(2))
+  -- end
 
   -- computed values
+  track_length = #segments * segment_length
   camera_depth = 1 / Math.tan((fov/2) * rad_constant)
   sub_z = camera_height * camera_depth
 end
@@ -138,7 +168,7 @@ function increment (start, amount, max)
 end
 
 function _update60 ()
-  camera_z = increment(camera_z, sub_speed, track_length)
+  -- camera_z = increment(camera_z, sub_speed, track_length)
 
   local dx = sub_speed/sub_max_speed
 
@@ -162,6 +192,8 @@ function _update60 ()
   local command = next_step[1]
   local amount = next_step[2]
 
+  soln_last_horz = soln_horz
+
   if command == 'forward' then
     soln_horz += amount
     soln_depth += (soln_aim * amount) >> 16
@@ -175,27 +207,35 @@ function _update60 ()
     soln_aim -= amount
   end
 
-  -- if soln_step % 30 == 0 then
-  --   add_road(30, 30, 30, ((soln_aim % 360) / 360) * 6)
-  -- end
+  soln_cur_horz += (soln_horz - soln_cur_horz) * 0.025
+  local speed = mid(0, soln_horz - soln_cur_horz, sub_max_speed)
+  camera_z = increment(camera_z, speed, track_length)
 
   soln_step += 1
 end
 
 function _draw ()
-	cls(1)
+	cls(col_bg)
+
+  -- fillp(0b0101101001011010)
+  fillp(0b0000111100001111)
+  rectfill(0, 0, 128, 128, 2)
+
+  fillp(0b0000000000000000)
+  circfill(64, 64, 52, 2)
 
   -- segments
   local base_segment = find_segment(camera_z)
   local base_percent = (camera_z%segment_length) / segment_length
   local seg_dx = - (base_segment.curve * base_percent)
   local seg_x = 0
-  local segment, max_y, camera_x
+  local segment, max_y, camera_x, segment_index
 
   max_y = 128
-  for n = 1, draw_dist do
+  for n = 0, draw_dist do
     segment = segments[((base_segment.index + n) % #segments) + 1]
     segment.looped = segment.index < base_segment.index
+    segment.clip = max_y
 
     local len = 0
     if segment.looped then len = track_length end
@@ -209,35 +249,110 @@ function _draw ()
 
     if (
       (segment.p1.camera.z > camera_depth) and
+      (segment.p2.screen.y < segment.p1.screen.y) and
       (segment.p2.screen.y < max_y)
     ) then
       rectfill(
         0, segment.p2.screen.y,
         128, segment.p1.screen.y + (segment.p1.screen.y-segment.p2.screen.y),
-        13
+        col_ground
       )
-      max_y = segment.p2.screen.y
+      max_y = segment.p1.screen.y
     end
   end
 
   max_y = 128
   for n = 1, draw_dist do
-    segment = segments[((base_segment.index + n) % #segments) + 1]
+    segment_index = ((base_segment.index + n) % #segments) + 1
+    segment = segments[segment_index]
 
     if (
       (segment.p1.camera.z > camera_depth) and
+      (segment.p2.screen.y < segment.p1.screen.y) and
       (segment.p2.screen.y < max_y)
     ) then
+      if segment.index % 10 < 3 then
+        draw_segment(
+          segment.p1.screen.x,
+          segment.p1.screen.y,
+          segment.p1.screen.w * 5,
+          segment.p2.screen.x,
+          segment.p2.screen.y,
+          segment.p2.screen.w * 5,
+          col_bg
+        )
+      end
+      if segment.index % 5 < 3 then
       draw_segment(
         segment.p1.screen.x,
         segment.p1.screen.y,
-        segment.p1.screen.w,
+        segment.p1.screen.w*2.5 + segment.wiggle*20,
         segment.p2.screen.x,
         segment.p2.screen.y,
-        segment.p2.screen.w,
-        segment.color
+        segment.p2.screen.w*2.5 + segment.wiggle*20,
+        col_track_0
       )
-      max_y = segment.p2.screen.y
+      end
+      -- if segment.index % 5 < 4 then
+        draw_segment(
+          segment.p1.screen.x,
+          segment.p1.screen.y,
+          segment.p1.screen.w*1.5 + segment.wiggle*5,
+          segment.p2.screen.x,
+          segment.p2.screen.y,
+          segment.p2.screen.w*1.5 + segment.wiggle*5,
+          col_track_1
+        )
+      -- end
+      -- if segment.index % 4 < 3 then
+        draw_segment(
+          segment.p1.screen.x,
+          segment.p1.screen.y,
+          segment.p1.screen.w*1.35,
+          segment.p2.screen.x,
+          segment.p2.screen.y,
+          segment.p2.screen.w*1.35,
+          col_track_2
+        )
+      -- end
+      draw_segment(
+        segment.p1.screen.x,
+        segment.p1.screen.y,
+        segment.p1.screen.w + segment.wiggle*7 - 3,
+        segment.p2.screen.x,
+        segment.p2.screen.y,
+        segment.p2.screen.w + segment.wiggle*7 - 3,
+        col_track_3
+      )
+      max_y = segment.p1.screen.y
+    end
+  end
+
+  local sprite, sprite_scale, sprite_x, sprite_y, sprite_offset
+  for n = draw_dist-1, 0, -1 do
+    segment = segments[((base_segment.index + n) % #segments) + 1]
+
+    for i = 1, #segment.sprites do
+      sprite = segment.sprites[i]
+      sprite_scale = segment.p1.screen.scale
+      sprite_x = segment.p1.screen.x + (sprite_scale * sprite.offset * segment_width * 64)
+      sprite_y = segment.p1.screen.y
+      sprite_offset = 0
+      if sprite.offset < 0 then sprite_offset = -1 end
+      -- Render.sprite(
+      --   64,
+      --   64,
+      --   1,
+      --   segment_width,
+      --   sprites,
+      --   sprite.sprite,
+      --   sprite_scale,
+      --   sprite_x,
+      --   sprite_y,
+      --   sprite_offset,
+      --   -1,
+      --   segment.clip
+      -- )
     end
   end
 
