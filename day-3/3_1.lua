@@ -16,9 +16,6 @@ function _init ()
 end
 
 function _update60 ()
-  -- todo
-  -- Animate._update()
-  
   if input[soln_step] == nil then return end
 
   for x = 1, soln_bit_len do
@@ -47,7 +44,7 @@ function _draw ()
 
   local color = 6
   if input[soln_step] == nil then color = 8 end
-  
+
   for i = 1, soln_bit_len do
     print(soln_common_bits[i], (i*4)-4, 0, color)
     print(soln_flipped_bits[i], (i*4)-4, 6, color)
